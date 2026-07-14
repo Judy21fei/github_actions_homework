@@ -33,9 +33,8 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run Tests with pytest and Coverage
-        # Флаг --cov-fail-under=70 завалить пайплайн, якщо покриття менше 70%
         run: |
-          pytest --cov=myapp --cov-report=html --cov-report=term --cov-fail-under=70 tests/
+          python -m pytest --cov=myapp --cov-report=html --cov-report=term --cov-fail-under=70 tests/
 
       - name: Upload coverage report artifact
         if: always() # Завантажує звіт навіть якщо тести впали, для аналізу помилок
