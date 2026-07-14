@@ -9,7 +9,7 @@ on:
       - develop
 
 permissions:
-  contents: write # Дозволяє GitHub Actions записувати зміни в репозиторій (оновлювати README.md)
+  contents: write # Дозволяє роботу автоматично комітити та пушити зміни в репозиторій
 
 jobs:
   # --- ЗАВДАННЯ 1 та 2: Тестування та покриття коду ---
@@ -33,13 +33,13 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run Tests with pytest and Coverage
-        # Використовуємо python -m pytest для уникнення проблем з імпортом модуля myapp
-        # Флаг --cov-fail-under=70 завалить пайплайн, якщо покриття менше 70%
+        # Використовуємо "python -m pytest", щоб уникнути помилок імпорту модуля 'myapp'
+        # Пайплайн впаде, якщо покриття буде меншим за 70%
         run: |
           python -m pytest --cov=myapp --cov-report=html --cov-report=term --cov-fail-under=70 tests/
 
       - name: Upload coverage report artifact
-        if: always() # Завантажує звіт навіть якщо тести впали, для аналізу помилок
+        if: always() # Завантажуємо звіт у будь-якому випадку (навіть якщо тести впали)
         uses: actions/upload-artifact@v4
         with:
           name: html-coverage-report
@@ -47,14 +47,13 @@ jobs:
 
   # --- ЗАВДАННЯ 3: Крок збірки та бейдж статусу ---
   build:
-    needs: test # Збірка запуститься ТІЛЬКИ якщо тести (job test) пройшли успішно
+    needs: test # Збірка запускається ТІЛЬКИ якщо тести пройшли успішно
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          # Якщо це Pull Request — завантажуємо саме ту гілку, з якої створено PR.
-          # Якщо це звичайний push — завантажуємо поточну гілку за замовчуванням.
+          # Завантажуємо гілку, з якої створено PR (head_ref) або поточну (ref_name)
           ref: ${{ github.head_ref || github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -72,17 +71,15 @@ jobs:
             echo "Бейдж вже є в README.md. Пропускаємо оновлення."
           else
             echo "Бейдж відсутній. Додаємо вгору файлу README.md..."
-            # Додаємо бейдж на самий початок файлу
+            # Записуємо бейдж на самий початок файлу
             echo -e "$BADGE_MARKDOWN\n\n$(cat README.md)" > README.md
-            
-            # Налаштовуємо Git для коміту від імені бота
-            git config --global user.name "github-actions[bot]"
-            git config --global user.email "github-actions[bot]@users.noreply.github.com"
-            
-            git add README.md
-            git commit -m "docs: auto-add workflow status badge to README [skip ci]"
-            
-            # Визначаємо цільову гілку для безпечного пушу (враховуємо і PR, і звичайний push)
-            TARGET_BRANCH="${{ github.head_ref || github.ref_name }}"
-            git push origin HEAD:refs/heads/$TARGET_BRANCH
           fi
+
+      # Безпечний автоматичний коміт та пуш змін у правильну гілку
+      - name: Commit and Push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "docs: auto-add workflow status badge to README [skip ci]"
+          file_pattern: "README.md"
+          commit_user_name: "github-actions[bot]"
+          commit_user_email: "github-actions[bot]@users.noreply.github.com"
