@@ -9,7 +9,7 @@ on:
       - develop
 
 permissions:
-  contents: write # Дозволяє кроку build редагувати та пушити зміни в README.md
+  contents: write # Дозволяє автоматично комітити та пушити зміни в репозиторій
 
 jobs:
   # --- ЗАВДАННЯ 1 та 2: Тестування та покриття коду ---
@@ -37,7 +37,7 @@ jobs:
           python -m pytest --cov=myapp --cov-report=html --cov-report=term --cov-fail-under=70 tests/
 
       - name: Upload coverage report artifact
-        if: always() # Завантажує звіт навіть якщо тести впали, для аналізу помилок
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: html-coverage-report
@@ -45,36 +45,35 @@ jobs:
 
   # --- ЗАВДАННЯ 3: Крок збірки та бейдж статусу ---
   build:
-    needs: test # Збірка запуститься ТІЛЬКИ якщо тести (job test) пройшли успішно
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }} # Використовуємо токен для запису в репозиторій
+          ref: ${{ github.head_ref || github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Add Build Status Badge to README
         run: |
           BADGE_MARKDOWN="![CI/CD Pipeline](https://github.com/${{ github.repository }}/actions/workflows/workflow.yml/badge.svg)"
 
-          # Створюємо README.md, якщо його немає
           if [ ! -f README.md ]; then
             touch README.md
           fi
 
-          # Перевіряємо, чи бейдж вже є в файлі
           if grep -q "actions/workflows/workflow.yml/badge.svg" README.md; then
             echo "Бейдж вже є в README.md. Пропускаємо оновлення."
           else
             echo "Бейдж відсутній. Додаємо вгору файлу README.md..."
-            # Додаємо бейдж на самий початок файлу
             echo -e "$BADGE_MARKDOWN\n\n$(cat README.md)" > README.md
-            
-            # Налаштовуємо Git для коміту від імені бота
-            git config --global user.name "github-actions[bot]"
-            git config --global user.email "github-actions[bot]@users.noreply.github.com"
-            
-            git add README.md
-            git commit -m "docs: auto-add workflow status badge to README [skip ci]"
-            git push
           fi
+
+      # Використовуємо офіційний екшн замість ручного "git push"
+      - name: Commit and Push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "docs: auto-add workflow status badge to README [skip ci]"
+          file_pattern: "README.md"
+          commit_user_name: "github-actions[bot]"
+          commit_user_email: "github-actions[bot]@users.noreply.github.com"
